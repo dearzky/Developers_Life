@@ -35,8 +35,8 @@ import java.util.Random;
 public class MainActivity extends AppCompatActivity {
 
     TabLayout tabs;
-    TextView tv;
-    ImageView iv;
+    TextView description;
+    ImageView gif;
     ImageButton back, next;
 
     Map<Integer, String> hashText = new HashMap<>();
@@ -49,58 +49,58 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         tabs = (TabLayout) findViewById(R.id.tabLayout);
-        tv = (TextView) findViewById(R.id.textView);
-        iv = (ImageView) findViewById(R.id.imageView);
-        back = (ImageButton) findViewById(R.id.button2);
-        next = (ImageButton) findViewById(R.id.button);
+        description = (TextView) findViewById(R.id.description);
+        gif = (ImageView) findViewById(R.id.gif);
+        back = (ImageButton) findViewById(R.id.back);
+        next = (ImageButton) findViewById(R.id.next);
 
         back.setEnabled(false);
 
         final Animation animAlpha = AnimationUtils.loadAnimation(this, R.anim.alpha);
-        SetTextAndGif("https://developerslife.ru/latest/" + RandomNumber() + "?json=true");
+        SetTextAndGif("https://developerslife.ru/latest/" + RandomNumber() + "?json=true"); // первая прогрузка данных
 
-        back.setOnClickListener(v -> {
-            v.startAnimation(animAlpha);
+        back.setOnClickListener(v -> { // обработчик нажатия "назад"
+            v.startAnimation(animAlpha); // анимация
 
-            hashLevel--;
-            tv.setText(hashText.get(hashLevel));
+            hashLevel--; // проходим вниз по уровню кэша
+            description.setText(hashText.get(hashLevel)); // выводим текст
             Glide.with(getApplicationContext())
                     .load(hashGifs.get(hashLevel))
-                    .placeholder(R.drawable.loading)
+                    .thumbnail(Glide.with(getApplicationContext()).load(R.drawable.loading))
                     .centerCrop()
-                    .into(iv);
+                    .into(gif); // выводим гифку
 
-            if (hashLevel == 0) {
+            if (hashLevel == 0) { // если кэш уровень стал равен нуля то кнопку назад делаем не активной
                 back.setEnabled(false);
             }
         });
 
-        next.setOnClickListener(v -> {
-            v.startAnimation(animAlpha);
-            back.setEnabled(true);
-            hashLevel++;
-            if (hashText.size() > hashLevel){
+        next.setOnClickListener(v -> { // обработчик нажатия "следующая"
+            v.startAnimation(animAlpha); // анимация
+            back.setEnabled(true); // назад делаем активной
+            hashLevel++; // проходим вперед по уровню кэша
+            if (hashText.size() > hashLevel){ // читаем кэш если это возможно
 
-                tv.setText(hashText.get(hashLevel));
+                description.setText(hashText.get(hashLevel)); // выводим текст
                 Glide.with(getApplicationContext())
                         .load(hashGifs.get(hashLevel))
                         .placeholder(R.drawable.loading)
                         .centerCrop()
-                        .into(iv);
+                        .into(gif); // выводим гифку
                 return;
             }
-
+            // если кэш полностью прошли то подгружаем новые данные с сервера
             String finalUrl = ChooseCategory(tabs.getSelectedTabPosition());
             SetTextAndGif(finalUrl);
         });
 
         tabs.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
             @Override
-            public void onTabSelected(TabLayout.Tab tab) {
-                hashLevel = 0;
-                hashText.clear();
-                hashGifs.clear();
-                back.setEnabled(false);
+            public void onTabSelected(TabLayout.Tab tab) { // выбор элемента в категориях
+                hashLevel = 0; // сбрасываем кэщ
+                hashText.clear(); // очищаем кэщ описания
+                hashGifs.clear(); // очищаем кэщ гивок
+                back.setEnabled(false); // делаем кнопку назад не активной
 
                 String finalUrl = ChooseCategory(tab.getPosition());
                 SetTextAndGif(finalUrl);
@@ -118,6 +118,7 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    /* Функция отправляющая get запрос, и занимается обработкой полученных данных */
     void SetTextAndGif(String query) {
         if(isOnline(this)) {
             Thread thread = new Thread(() -> {
@@ -127,7 +128,7 @@ public class MainActivity extends AppCompatActivity {
 
                 URL url = null;
                 try {
-                    url = new URL(query);
+                    url = new URL(query); // формируем url для отправки get запросом
                 } catch (MalformedURLException e) {
                     e.printStackTrace();
                 }
@@ -142,11 +143,12 @@ public class MainActivity extends AppCompatActivity {
 
                 while (true) {
                     try {
-                        if (!((str = in.readLine()) != null)) break;
+                        assert in != null;
+                        if ((str = in.readLine()) == null) break;
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
-                    textJSON.append(str);
+                    textJSON.append(str); // читаем полученные данные построчно и складываем в переменную
                 }
 
                 try {
@@ -164,64 +166,63 @@ public class MainActivity extends AppCompatActivity {
 
                 try {
                     assert jsonObject != null;
-                    str = jsonObject.getJSONArray("result").getJSONObject(0).getString("description");
+                    str = jsonObject.getJSONArray("result").getJSONObject(0).getString("description"); // получаем выборочные данные, описание из первого подмассива
                 } catch (JSONException e) {
                     e.printStackTrace();
                 }
-                tv.setText(String.valueOf(str));
+                description.setText(String.valueOf(str)); // выводим описание на экран
 
-                hashText.put(hashLevel, str);
+                hashText.put(hashLevel, str); // добавляем описание в кэш
 
                 String gifURL = null;
                 try {
-                    gifURL = jsonObject.getJSONArray("result").getJSONObject(0).getString("gifURL");
+                    gifURL = jsonObject.getJSONArray("result").getJSONObject(0).getString("gifURL"); // получаем url на gif из первого подмассива
                 } catch (JSONException e) {
                     e.printStackTrace();
                 }
                 assert gifURL != null;
-                String finalGifURL = gifURL.replace("http:", "https:");
-
+                String finalGifURL = gifURL.replace("http:", "https:"); // заменяем http на https. с http не хочет работать
 
                 runOnUiThread(() -> Glide.with(getApplicationContext())
                         .load(finalGifURL)
-                        .placeholder(R.drawable.loading)
+                        .thumbnail(Glide.with(getApplicationContext()).load(R.drawable.loading))
                         .centerCrop()
                         .diskCacheStrategy(DiskCacheStrategy.RESOURCE)
-                        .into(iv));
+                        .into(gif)); // выводим gif на экран, пока грузится показываем значок загрузки
 
-                hashGifs.put(hashLevel, finalGifURL);
+                hashGifs.put(hashLevel, finalGifURL); // добавляем url на gif в кэш, не добавлял в полноценную gif в кэш потому что как я понял glide сам кэширует данные, по крайней мере уже загруженные файлы выводятся на экран быстрее и подгружаются без интернета
             });
-            thread.start();
+            thread.start(); // запускаем всю обработку в отдельном потоке
         }
-        else {
-            hashLevel--;
-            if (hashLevel == -1)
+        else { // если не прошла проверка на пожкд.чение к сети
+            hashLevel--; // уменьшаем значение кэша так как до этого его увеличили
+            if (hashLevel == -1) // тут обрабатываем ситуацию когда с первой загрузки без сети по нажатию кнопки дальше кнопка назад становится активна
                 back.setEnabled(false);
             Toast toast = Toast.makeText(MainActivity.this, "Произошла ошибка при загрузке данных. Проверьте подключение к сети.", Toast.LENGTH_SHORT);
             toast.setGravity(Gravity.CENTER, 0, 0);
-            toast.show();
+            toast.show(); // выводим сообщение об ошибке
         }
     }
 
+    /* Функция получения случайного числа на диапозоне до 1500 */
     int RandomNumber()
     {
         Random random = new Random();
         return random.nextInt(1500 + 1);
     }
 
+    /* Функция принимающая номер выбранной категории и вызывающая функцию отправки get запроса */
     String ChooseCategory(int numCategory)
     {
         String url = "";
-        switch (tabs.getSelectedTabPosition()) {
+        switch (numCategory) {
             case 0:
                 url = "https://developerslife.ru/latest/" + RandomNumber() + "?json=true";
                 break;
             case 1:
-                url = "https://developerslife.ru/top/" + RandomNumber() + "?json=true";
-                break;
             case 2:
-                //url = "https://developerslife.ru/hot/" + RandomNumber() + "?json=true"; //Не работает!!!
                 url = "https://developerslife.ru/top/" + RandomNumber() + "?json=true";
+                //url = "https://developerslife.ru/hot/" + RandomNumber() + "?json=true"; // Горячее не работает!!!
                 break;
             default:
                 break;
@@ -229,6 +230,7 @@ public class MainActivity extends AppCompatActivity {
         return url;
     }
 
+    /* Функция проверки подключения сети */
     public static boolean isOnline(Context context)
     {
         ConnectivityManager cm =
