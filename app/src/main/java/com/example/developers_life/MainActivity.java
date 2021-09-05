@@ -1,6 +1,5 @@
 package com.example.developers_life;
 
-
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.content.Context;
@@ -16,7 +15,6 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.bumptech.glide.Glide;
-import com.bumptech.glide.load.engine.DiskCacheStrategy;
 import com.google.android.material.tabs.TabLayout;
 
 import org.json.JSONException;
@@ -43,32 +41,29 @@ public class MainActivity extends AppCompatActivity {
     Map<Integer, String> hashGifs = new HashMap<>();
     int hashLevel = 0;
 
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        tabs = (TabLayout) findViewById(R.id.tabLayout);
-        description = (TextView) findViewById(R.id.description);
-        gif = (ImageView) findViewById(R.id.gif);
-        back = (ImageButton) findViewById(R.id.back);
-        next = (ImageButton) findViewById(R.id.next);
+        tabs = findViewById(R.id.tabLayout);
+        description = findViewById(R.id.description);
+        gif = findViewById(R.id.gif);
+        back = findViewById(R.id.back);
+        next = findViewById(R.id.next);
 
         back.setEnabled(false);
 
         final Animation animAlpha = AnimationUtils.loadAnimation(this, R.anim.alpha);
-        SetTextAndGif("https://developerslife.ru/latest/" + RandomNumber() + "?json=true"); // первая прогрузка данных
+        Extract("https://developerslife.ru/latest/" + RandomNumber() + "?json=true"); // первая прогрузка данных
 
         back.setOnClickListener(v -> { // обработчик нажатия "назад"
             v.startAnimation(animAlpha); // анимация
 
             hashLevel--; // проходим вниз по уровню кэша
-            description.setText(hashText.get(hashLevel)); // выводим текст
-            Glide.with(getApplicationContext())
-                    .load(hashGifs.get(hashLevel))
-                    .thumbnail(Glide.with(getApplicationContext()).load(R.drawable.loading))
-                    .centerCrop()
-                    .into(gif); // выводим гифку
+
+            SetTextAndGif(hashText.get(hashLevel), hashGifs.get(hashLevel));
 
             if (hashLevel == 0) { // если кэш уровень стал равен нуля то кнопку назад делаем не активной
                 back.setEnabled(false);
@@ -81,17 +76,12 @@ public class MainActivity extends AppCompatActivity {
             hashLevel++; // проходим вперед по уровню кэша
             if (hashText.size() > hashLevel){ // читаем кэш если это возможно
 
-                description.setText(hashText.get(hashLevel)); // выводим текст
-                Glide.with(getApplicationContext())
-                        .load(hashGifs.get(hashLevel))
-                        .placeholder(R.drawable.loading)
-                        .centerCrop()
-                        .into(gif); // выводим гифку
+                SetTextAndGif(hashText.get(hashLevel), hashGifs.get(hashLevel));
                 return;
             }
             // если кэш полностью прошли то подгружаем новые данные с сервера
             String finalUrl = ChooseCategory(tabs.getSelectedTabPosition());
-            SetTextAndGif(finalUrl);
+            Extract(finalUrl);
         });
 
         tabs.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
@@ -103,98 +93,52 @@ public class MainActivity extends AppCompatActivity {
                 back.setEnabled(false); // делаем кнопку назад не активной
 
                 String finalUrl = ChooseCategory(tab.getPosition());
-                SetTextAndGif(finalUrl);
+                Extract(finalUrl);
             }
-
             @Override
             public void onTabUnselected(TabLayout.Tab tab) {
-
             }
-
             @Override
             public void onTabReselected(TabLayout.Tab tab) {
-
             }
         });
     }
 
     /* Функция отправляющая get запрос, и занимается обработкой полученных данных */
-    void SetTextAndGif(String query) {
+    void Extract(String query) {
         if(isOnline(this)) {
             Thread thread = new Thread(() -> {
-
-                String str = "";
-                StringBuilder textJSON = new StringBuilder();
-
-                URL url = null;
-                try {
-                    url = new URL(query); // формируем url для отправки get запросом
-                } catch (MalformedURLException e) {
-                    e.printStackTrace();
-                }
-
-                BufferedReader in = null;
-                try {
-                    assert url != null;
-                    in = new BufferedReader(new InputStreamReader(url.openStream()));
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-
-                while (true) {
-                    try {
-                        assert in != null;
-                        if ((str = in.readLine()) == null) break;
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                    textJSON.append(str); // читаем полученные данные построчно и складываем в переменную
-                }
-
-                try {
-                    in.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-
                 JSONObject jsonObject = null;
                 try {
-                    jsonObject = new JSONObject(textJSON.toString());
-                } catch (JSONException e) {
+                    jsonObject = convertToJObj(query);
+                } catch (IOException | JSONException e) {
                     e.printStackTrace();
                 }
 
+                String descrip = null;
                 try {
                     assert jsonObject != null;
-                    str = jsonObject.getJSONArray("result").getJSONObject(0).getString("description"); // получаем выборочные данные, описание из первого подмассива
+                    descrip = GetData(jsonObject,"description");
                 } catch (JSONException e) {
                     e.printStackTrace();
                 }
-                description.setText(String.valueOf(str)); // выводим описание на экран
-
-                hashText.put(hashLevel, str); // добавляем описание в кэш
 
                 String gifURL = null;
                 try {
-                    gifURL = jsonObject.getJSONArray("result").getJSONObject(0).getString("gifURL"); // получаем url на gif из первого подмассива
+                    gifURL = GetData(jsonObject,"gifURL");
                 } catch (JSONException e) {
                     e.printStackTrace();
                 }
-                assert gifURL != null;
-                String finalGifURL = gifURL.replace("http:", "https:"); // заменяем http на https. с http не хочет работать
 
-                runOnUiThread(() -> Glide.with(getApplicationContext())
-                        .load(finalGifURL)
-                        .thumbnail(Glide.with(getApplicationContext()).load(R.drawable.loading))
-                        .centerCrop()
-                        .diskCacheStrategy(DiskCacheStrategy.RESOURCE)
-                        .into(gif)); // выводим gif на экран, пока грузится показываем значок загрузки
+                String finalGifURL = gifURL != null ? gifURL.replace("http:", "https:") : null; // заменяем http на https. с http не хочет работать
 
-                hashGifs.put(hashLevel, finalGifURL); // добавляем url на gif в кэш, не добавлял в полноценную gif в кэш потому что как я понял glide сам кэширует данные, по крайней мере уже загруженные файлы выводятся на экран быстрее и подгружаются без интернета
+                SetTextAndGif(descrip, finalGifURL);
+                hashText.put(hashLevel, descrip); // добавляем описание в кэш
+                hashGifs.put(hashLevel, finalGifURL); // добавляем url на gif в кэш, не добавлял полноценную gif в кэш потому что как я понял glide сам кэширует данные, по крайней мере уже загруженные файлы выводятся на экран быстрее и подгружаются без интернета
             });
             thread.start(); // запускаем всю обработку в отдельном потоке
         }
-        else { // если не прошла проверка на пожкд.чение к сети
+        else { // если не прошла проверка на подключениечение к сети
             hashLevel--; // уменьшаем значение кэша так как до этого его увеличили
             if (hashLevel == -1) // тут обрабатываем ситуацию когда с первой загрузки без сети по нажатию кнопки дальше кнопка назад становится активна
                 back.setEnabled(false);
@@ -204,15 +148,49 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    static URL setURL(String query) throws MalformedURLException {
+        return new URL(query);
+    }
+
+    static StringBuilder getAnswerFromGetQuery(String query) throws IOException {
+        BufferedReader in = new BufferedReader(new InputStreamReader(setURL(query).openStream()));
+        String str;
+        StringBuilder textJSON = new StringBuilder();
+
+        while ((str = in.readLine()) != null) {
+            textJSON.append(str); // читаем полученные данные построчно и складываем в переменную
+        }
+        in.close();
+        return textJSON;
+    }
+
+    static JSONObject convertToJObj(String query) throws IOException, JSONException {
+        return new JSONObject(getAnswerFromGetQuery(query).toString());
+    }
+
+    static String GetData(JSONObject jobj, String field) throws JSONException {
+        return jobj.getJSONArray("result").getJSONObject(0).getString(field);
+    }
+
+    void SetTextAndGif(String desc, String Gif)
+    {
+        description.setText(desc); // выводим текст
+        runOnUiThread(() -> Glide.with(getApplicationContext())
+                .load(Gif)
+                .thumbnail(Glide.with(getApplicationContext()).load(R.drawable.loading))
+                .centerCrop()
+                .into(gif)); // выводим гифку
+    }
+
     /* Функция получения случайного числа на диапозоне до 1500 */
-    int RandomNumber()
+    static int RandomNumber()
     {
         Random random = new Random();
         return random.nextInt(1500 + 1);
     }
 
     /* Функция принимающая номер выбранной категории и вызывающая функцию отправки get запроса */
-    String ChooseCategory(int numCategory)
+    static String ChooseCategory(int numCategory)
     {
         String url = "";
         switch (numCategory) {

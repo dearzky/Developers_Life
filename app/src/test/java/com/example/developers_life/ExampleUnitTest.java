@@ -11,7 +11,17 @@ import static org.junit.Assert.*;
  */
 public class ExampleUnitTest {
     @Test
-    public void addition_isCorrect() {
-        assertEquals(4, 2 + 2);
+    public void CategoryLatestIsCorrect() {
+        assertTrue("Категория не равна latest!", MainActivity.ChooseCategory(0).contains("latest"));
+    }
+
+    @Test
+    public void CategoryTopIsCorrect() {
+        assertTrue("Категория не равна top!", MainActivity.ChooseCategory(1).contains("top"));
+    }
+
+    @Test
+    public void CategoryHotIsCorrect() {
+        assertTrue("Категория не равна hot!", MainActivity.ChooseCategory(2).contains("top"));
     }
 }

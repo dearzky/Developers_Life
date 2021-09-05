@@ -3,4 +3,7 @@
     <string name="latest">Последние</string>
     <string name="top">Лучшие</string>
     <string name="hot">Горячие</string>
+    <string name="todo" />
+    <string name="back" />
+    <string name="next" />
 </resources>
